@@ -47,6 +47,7 @@ userSchema.methods.comparePassword = function (candidatePassword) {
 };
 
 //Delete related posts & KYC when user is deleted
+// we use pre to make sure that the data linked to the user is deleted first before the user is deleted
 userSchema.pre(
   'deleteOne',
   { document: true, query: false },

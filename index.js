@@ -1,5 +1,5 @@
 require('dotenv').config();
-require('express-async-errors');
+require('express-async-errors'); //to catch error efficiently
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -28,7 +28,7 @@ mongoose
   .catch(() => {
     console.log('Cannot Establish Database connection');
   });
-
+// routes
 app.use(authRoutes);
 app.use(userRoutes);
 app.use(postRoutes);
