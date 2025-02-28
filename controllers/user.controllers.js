@@ -1,104 +1,72 @@
-const userModel = require('../models/user.model');
-const bcrypt = require('bcryptjs');
+const User = require('../models/user.model');
 
 const getAllUsers = async (req, res) => {
-  const users = await userModel.find().select('-password').lean();
-
-  if (!users?.length) {
+  const users = await User.find().select('-password').lean();
+  if (!users.length)
     return res.status(404).json({ message: 'No user available' });
-  }
 
   res.status(200).json({ users });
 };
 
 const getSingleUser = async (req, res) => {
   const userID = req.params.id;
-
-  const isUser = await userModel
-    .findOne({ _id: userID })
-    .select('-password')
-    .lean();
-
-  if (!isUser) {
-    return res.status(404).json({ message: 'User not found' });
-  }
+  const isUser = await User.findById(userID).select('-password').lean();
+  if (!isUser) return res.status(404).json({ message: 'User not found' });
 
   res.status(200).json(isUser);
 };
 
 const createUser = async (req, res) => {
   const { email, password, name, age } = req.body;
+  if (!email || !password || !name || !age)
+    return res.status(400).json({ message: 'Please provide all details' });
 
-  if (!email || !password || !name || !age) {
-    return res.status(400).json({ message: 'Please provide your details' });
-  }
-  // checking if the email provided exist already in the database
-  const isRegisteredUser = await userModel
-    .findOne({ email })
+  const isRegisteredUser = await User.findOne({ email })
     .collation({ locale: 'en', strength: 2 })
-    .lean()
-    .exec();
-
-  if (isRegisteredUser) {
-    return res.status(409).json({ message: 'Email Already in Use' });
-  }
-
-  // creating a new user
-  const newUser = new userModel({
-    name,
-    email,
-    age,
-    password,
-  });
-
-  // saving the user data to database
-  await newUser.save();
-  res.status(201).json({ message: 'User Registered Successfully' });
-};
-
-const updateUser = async (req, res) => {
-  const id = req.id;
-
-  const { password, email, name, age } = req.body;
-
-  const isUser = await userModel.findById({ _id: id }).lean();
-
-  if (!isUser) {
-    return res.status(404).json({ message: ' User does not exist' });
-  }
-  const updatedUser = { password, email, name, age };
-
-  const duplicate = await userModel
-    .findOne({ email: updatedUser.email })
     .lean();
+  if (isRegisteredUser)
+    return res.status(409).json({ message: 'Email already in use' });
 
-  if (duplicate) {
-    return res.status(409).json({ message: 'Email already in Use' });
-  }
-
-  const newData = await userModel
-    .findOneAndUpdate({ _id: id }, updatedUser, {
-      new: true,
-    })
-    .select('-password');
-  res.status(201).json(newData);
+  const newUser = new User({ name, email, age, password });
+  await newUser.save();
+  res.status(201).json({ message: 'User registered successfully' });
 };
 
+// Users can only update **their own** profile
+const updateUser = async (req, res) => {
+  const userId = req.id;
+  const { email, name, age, password } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  if (email && email !== user.email) {
+    const duplicate = await User.findOne({ email }).lean();
+    if (duplicate)
+      return res.status(409).json({ message: 'Email already in use' });
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { name, email, age, password },
+    {
+      new: true,
+      runValidators: true,
+      context: 'query',
+    }
+  ).select('-password');
+
+  res.status(200).json(updatedUser);
+};
+
+// Users can only delete their own account
 const deleteUser = async (req, res) => {
-  const id = req.id;
+  const userId = req.id;
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: 'User not found' });
 
-  if (id) {
-    return res.status(401).json({ message: 'User email required' });
-  }
-
-  const isUser = await userModel.findOne({ _id: id });
-
-  if (!isUser) {
-    return res.status(404).json({ message: 'User not found' });
-  }
-
-  const result = await isUser.deleteOne();
-  res.status(201).json({ message: `user deleted successfully` });
+  await user.deleteOne();
+  res.status(200).json({ message: 'User deleted successfully' });
 };
 
 module.exports = {
